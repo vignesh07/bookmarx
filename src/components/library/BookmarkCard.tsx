@@ -9,7 +9,7 @@ import {
   MoreHorizontal,
   ExternalLink,
 } from "lucide-react";
-import { relativeTime, readingTimeMinutes } from "@/lib/format";
+import { relativeTime, readingTimeMinutes, cleanTweetText } from "@/lib/format";
 import type { LibraryRow } from "@/lib/queries";
 
 export function BookmarkCard({
@@ -19,7 +19,8 @@ export function BookmarkCard({
   row: LibraryRow;
   layout?: "list" | "grid";
 }) {
-  const minutes = readingTimeMinutes(row.text);
+  const bodyText = cleanTweetText(row.text);
+  const minutes = readingTimeMinutes(bodyText || row.text);
   const primaryLink = row.links[0];
   const primaryMedia = row.media[0];
   const collection = row.collections[0];
@@ -41,11 +42,13 @@ export function BookmarkCard({
             {relativeTime(row.bookmarkedAt)}
           </time>
         </header>
-        <Link href={`/b/${row.id}`} className="group">
-          <p className="line-clamp-4 font-serif text-[15.5px] leading-[1.4] text-ink group-hover:text-ink/85">
-            {row.text}
-          </p>
-        </Link>
+        {bodyText && (
+          <Link href={`/b/${row.id}`} className="group">
+            <p className="line-clamp-4 font-serif text-[15.5px] leading-[1.4] text-ink group-hover:text-ink/85">
+              {bodyText}
+            </p>
+          </Link>
+        )}
         {primaryLink && (
           <LinkPreview
             linkId={primaryLink.id}
@@ -144,11 +147,13 @@ export function BookmarkCard({
           )}
         </header>
 
-        <Link href={`/b/${row.id}`} className="group">
-          <p className="max-w-[680px] font-serif text-[23px] leading-[1.35] tracking-[-0.005em] text-ink group-hover:text-ink/85">
-            {row.text}
-          </p>
-        </Link>
+        {bodyText && (
+          <Link href={`/b/${row.id}`} className="group">
+            <p className="max-w-[680px] font-serif text-[23px] leading-[1.35] tracking-[-0.005em] text-ink group-hover:text-ink/85">
+              {bodyText}
+            </p>
+          </Link>
+        )}
 
         {primaryLink && (
           <LinkPreview

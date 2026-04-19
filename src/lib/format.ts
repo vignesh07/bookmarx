@@ -52,12 +52,12 @@ export function readingTimeMinutes(text: string): number {
   return Math.max(1, Math.round(words / 230));
 }
 
-// X auto-appends `https://t.co/…` tokens at the end of tweet text for
-// every attached photo, video, or card. In a reader view those are
-// redundant with the media/link card that renders below, so drop
-// trailing t.co URLs.
-const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/\w+\s*)+$/i;
+// X auto-appends `https://t.co/…` tokens to tweet text for every
+// attached photo, video, or card. In a reader view those are always
+// redundant with the media/link card we render alongside, so strip
+// any t.co URL from the body, then collapse the whitespace it left.
+const TCO = /https?:\/\/t\.co\/\w+/gi;
 
 export function cleanTweetText(text: string): string {
-  return text.replace(TRAILING_TCO, "").trimEnd();
+  return text.replace(TCO, "").replace(/[ \t]+\n/g, "\n").replace(/\s{2,}/g, " ").trim();
 }
