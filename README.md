@@ -46,32 +46,36 @@ session. Nothing in the cloud, no accounts, no telemetry, no SaaS.
 - Zod for input validation
 - Chrome MV3 extension for sync
 
-## Quick start
+## Install
 
-You need Node 20+, pnpm, and a Postgres database running locally
-(Postgres.app, Homebrew, or `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`).
+You need [Docker](https://docs.docker.com/get-docker/) (or OrbStack /
+Colima / Podman) and a Chromium-based browser for the extension.
 
 ```bash
-# 1. Install deps
-pnpm install
-
-# 2. Point at your local Postgres
-cp .env.example .env
-# edit .env and set DATABASE_URL
-
-# 3. Push the schema to your database
-pnpm db:push
-
-# 4. (optional) Seed sample data so the UI has something to show
-pnpm seed
-
-# 5. Run the dev server
-pnpm dev
+curl -O https://raw.githubusercontent.com/vignesh07/bookmarx/main/docker-compose.yml
+docker compose up -d
 ```
 
-Open <http://localhost:3000>. Then install the
-[browser extension](./extension) and hit **Sync now** to pull your
-bookmarks in.
+That brings up Bookmarx + Postgres on `http://localhost:3000`. Migrations
+run automatically on first start, and your bookmarks persist in a Docker
+volume between restarts.
+
+Then install the [browser extension](./extension) — load it unpacked
+from a clone of this repo's `extension/` directory — open it, and hit
+**Sync now** to pull your bookmarks in.
+
+To stop:
+
+```bash
+docker compose down       # keep your data
+docker compose down -v    # nuke everything including the database
+```
+
+To upgrade to a newer release:
+
+```bash
+docker compose pull && docker compose up -d
+```
 
 ## Why local-only?
 
@@ -106,14 +110,26 @@ scripts/
   seed.ts                 Sample data
 ```
 
-## Development
+## Develop
+
+If you want to hack on Bookmarx itself, skip Docker and run it directly.
+You need Node 20+, pnpm, and a Postgres database (Postgres.app,
+Homebrew, or `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`).
 
 ```bash
-pnpm dev          # next dev
+pnpm install
+cp .env.example .env       # set DATABASE_URL
+pnpm db:push               # create the schema
+pnpm seed                  # optional sample data
+pnpm dev                   # next dev on :3000
+```
+
+Other useful scripts:
+
+```bash
 pnpm lint         # eslint
 pnpm db:studio    # drizzle studio
 pnpm db:generate  # generate a migration after schema changes
-pnpm db:push      # apply schema directly (dev only)
 ```
 
 ## License
