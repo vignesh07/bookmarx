@@ -8,10 +8,28 @@ import { IngestPayload, ingestBookmarks } from "@/lib/ingest";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Max-Age": "86400",
+};
+
+function jsonResponse(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { ...CORS_HEADERS, ...(init?.headers ?? {}) },
+  });
+}
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(req: Request) {
   const token = process.env.INGEST_TOKEN;
   if (!token) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "INGEST_TOKEN not configured on the server" },
       { status: 500 },
     );
@@ -20,19 +38,19 @@ export async function POST(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
   const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (provided !== token) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return jsonResponse({ error: "unauthorized" }, { status: 401 });
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+    return jsonResponse({ error: "invalid json" }, { status: 400 });
   }
 
   const parsed = IngestPayload.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "validation failed", issues: parsed.error.issues },
       { status: 400 },
     );
@@ -59,7 +77,7 @@ export async function POST(req: Request) {
         bookmarksUpdated: result.updated,
       })
       .where(eq(syncRuns.id, runId));
-    return NextResponse.json({ ok: true, ...result });
+    return jsonResponse({ ok: true, ...result });
   } catch (err) {
     await db
       .update(syncRuns)
