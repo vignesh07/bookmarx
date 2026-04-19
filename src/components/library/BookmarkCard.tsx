@@ -29,12 +29,14 @@ export function BookmarkCard({
       <article className="flex flex-col gap-3 rounded-lg border border-hairline bg-surface p-4">
         <header className="flex items-center gap-2">
           <Avatar handle={row.author.handle} />
-          <Link
-            href={`/b/${row.id}`}
+          <a
+            href={`https://x.com/${row.author.handle}`}
+            target="_blank"
+            rel="noreferrer noopener"
             className="truncate text-[12.5px] font-semibold text-ink hover:underline"
           >
             {row.author.displayName}
-          </Link>
+          </a>
           <time className="ml-auto shrink-0 text-[11.5px] text-subtle">
             {relativeTime(row.bookmarkedAt)}
           </time>
@@ -105,13 +107,22 @@ export function BookmarkCard({
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <header className="flex items-center gap-2.5">
           <Avatar handle={row.author.handle} />
-          <Link
-            href={`/b/${row.id}`}
+          <a
+            href={`https://x.com/${row.author.handle}`}
+            target="_blank"
+            rel="noreferrer noopener"
             className="text-[13.5px] font-semibold text-ink hover:underline"
           >
             {row.author.displayName}
-          </Link>
-          <span className="text-[13px] text-subtle">@{row.author.handle}</span>
+          </a>
+          <a
+            href={`https://x.com/${row.author.handle}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-[13px] text-subtle hover:text-ink"
+          >
+            @{row.author.handle}
+          </a>
           <span className="size-[3px] rounded-full bg-[#C5BCA6]" />
           <time className="text-[13px] text-subtle">
             {relativeTime(row.bookmarkedAt)}

@@ -204,15 +204,22 @@ function AuthorRow({ bookmark }: { bookmark: BookmarkDetail }) {
         }}
       />
       <div className="flex flex-col">
-        <Link
-          href={`/?author=${bookmark.author.handle}`}
+        <a
+          href={`https://x.com/${bookmark.author.handle}`}
+          target="_blank"
+          rel="noreferrer noopener"
           className="font-serif text-[18px] leading-tight text-ink hover:underline"
         >
           {bookmark.author.displayName}
-        </Link>
-        <span className="text-[12.5px] text-subtle">
+        </a>
+        <a
+          href={`https://x.com/${bookmark.author.handle}`}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-[12.5px] text-subtle hover:text-ink"
+        >
           @{bookmark.author.handle}
-        </span>
+        </a>
       </div>
     </div>
   );
