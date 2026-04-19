@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Star, Check, Share } from "lucide-react";
+import { ArrowLeft, ExternalLink, Star, Check } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { HeaderShareButton } from "./HeaderShareButton";
 
 type Props = {
   postedAt: Date;
   sourceUrl: string;
   isFavorite: boolean;
   isRead: boolean;
+  shareTitle?: string | null;
 };
 
 export function ReaderHeader({
@@ -14,6 +16,7 @@ export function ReaderHeader({
   sourceUrl,
   isFavorite,
   isRead,
+  shareTitle,
 }: Props) {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
@@ -45,9 +48,7 @@ export function ReaderHeader({
         <IconButton aria-label={isRead ? "Mark unread" : "Mark read"} active={isRead}>
           <Check className="size-3.5" strokeWidth={1.7} />
         </IconButton>
-        <IconButton aria-label="Share">
-          <Share className="size-3.5" strokeWidth={1.7} />
-        </IconButton>
+        <HeaderShareButton url={sourceUrl} title={shareTitle} />
       </div>
     </header>
   );

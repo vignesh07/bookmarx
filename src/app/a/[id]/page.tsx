@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { bookmarks, links, authors } from "@/db/schema";
 import { fetchArticle } from "./actions";
 import { ShareBar } from "@/components/reader/ShareBar";
+import { ReadingProgress } from "@/components/reader/ReadingProgress";
 
 async function getLinkWithBookmark(id: string) {
   const [row] = await db
@@ -49,6 +50,7 @@ export default async function ArticlePage({
 
   return (
     <div className="min-h-screen bg-paper text-ink">
+      <ReadingProgress />
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
         <Link
           href={`/b/${bookmark.id}`}
