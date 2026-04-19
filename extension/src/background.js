@@ -9,6 +9,34 @@ import { installSniffer, captureNow, getCapturedConfig } from "./sniff.js";
 
 installSniffer();
 
+// Rewrite Origin/Referer on our own GraphQL requests so X doesn't silently
+// throttle (empty pages) based on the chrome-extension:// origin. Scoped to
+// extension-initiated requests via initiatorDomains; idempotent via
+// removeRuleIds so repeated boots don't stack rules.
+chrome.declarativeNetRequest
+  .updateDynamicRules({
+    removeRuleIds: [1],
+    addRules: [
+      {
+        id: 1,
+        priority: 1,
+        action: {
+          type: "modifyHeaders",
+          requestHeaders: [
+            { header: "Origin", operation: "set", value: "https://x.com" },
+            { header: "Referer", operation: "set", value: "https://x.com/" },
+          ],
+        },
+        condition: {
+          urlFilter: "https://x.com/i/api/graphql/*",
+          resourceTypes: ["xmlhttprequest"],
+          initiatorDomains: [chrome.runtime.id],
+        },
+      },
+    ],
+  })
+  .catch((err) => console.error("DNR rule registration failed:", err));
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sync") return;
   port.onMessage.addListener(async (msg) => {
@@ -30,8 +58,8 @@ async function runSync(port) {
     throw new Error("Configure server URL and token first.");
   }
 
-  const credentials = await loadXCredentials();
-  if (!credentials) {
+  const hasSession = await hasXSession();
+  if (!hasSession) {
     throw new Error(
       "Couldn't find x.com auth cookies. Sign in to X in another tab.",
     );
@@ -50,7 +78,9 @@ async function runSync(port) {
   const BATCH_SIZE = 50;
   let batch = [];
 
-  for await (const raw of fetchAllBookmarks(credentials, config)) {
+  const onLog = (text) => port.postMessage({ type: "progress", text });
+
+  for await (const raw of fetchAllBookmarks(config, { onLog })) {
     const transformed = transformBookmark(raw);
     if (!transformed) continue;
     batch.push(transformed);
@@ -98,11 +128,10 @@ async function upload(serverUrl, token, bookmarks) {
   return res.json();
 }
 
-async function loadXCredentials() {
+async function hasXSession() {
   const [auth, ct0] = await Promise.all([
     chrome.cookies.get({ url: "https://x.com", name: "auth_token" }),
     chrome.cookies.get({ url: "https://x.com", name: "ct0" }),
   ]);
-  if (!auth || !ct0) return null;
-  return { authToken: auth.value, csrfToken: ct0.value };
+  return Boolean(auth && ct0);
 }
