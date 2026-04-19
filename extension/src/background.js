@@ -39,17 +39,37 @@ chrome.declarativeNetRequest
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sync") return;
+  const send = makeSafeSender(port);
   port.onMessage.addListener(async (msg) => {
     if (msg.type !== "start") return;
     try {
-      await runSync(port);
+      await runSync(send);
     } catch (err) {
-      port.postMessage({ type: "error", text: String(err?.message ?? err) });
+      send({ type: "error", text: String(err?.message ?? err) });
     }
   });
 });
 
-async function runSync(port) {
+// Closing the popup disconnects the port; any subsequent postMessage
+// throws "Attempting to use a disconnected port object" and — because
+// the caller is inside a generator — takes down the whole sync.
+// Swallow that specific failure mode: progress updates are best-effort.
+function makeSafeSender(port) {
+  let connected = true;
+  port.onDisconnect.addListener(() => {
+    connected = false;
+  });
+  return (msg) => {
+    if (!connected) return;
+    try {
+      port.postMessage(msg);
+    } catch {
+      connected = false;
+    }
+  };
+}
+
+async function runSync(send) {
   const { serverUrl, token } = await chrome.storage.local.get([
     "serverUrl",
     "token",
@@ -65,7 +85,7 @@ async function runSync(port) {
     );
   }
 
-  port.postMessage({ type: "progress", text: "Capturing X API config..." });
+  send({ type: "progress", text: "Capturing X API config..." });
   let config = await getCapturedConfig();
   if (!config) {
     config = await captureNow();
@@ -78,18 +98,18 @@ async function runSync(port) {
   const BATCH_SIZE = 50;
   let batch = [];
 
-  const onLog = (text) => port.postMessage({ type: "progress", text });
+  const onLog = (text) => send({ type: "progress", text });
 
   for await (const raw of fetchAllBookmarks(config, { onLog })) {
     const transformed = transformBookmark(raw);
     if (!transformed) continue;
     batch.push(transformed);
     if (batch.length >= BATCH_SIZE) {
-      const r = await upload(serverUrl, token, batch);
+      const r = await upload(serverUrl, token, batch, onLog);
       totalSeen += r.seen;
       totalInserted += r.inserted;
       totalUpdated += r.updated;
-      port.postMessage({
+      send({
         type: "progress",
         text: `Synced ${totalSeen} so far (${totalInserted} new)...`,
       });
@@ -98,13 +118,13 @@ async function runSync(port) {
   }
 
   if (batch.length > 0) {
-    const r = await upload(serverUrl, token, batch);
+    const r = await upload(serverUrl, token, batch, onLog);
     totalSeen += r.seen;
     totalInserted += r.inserted;
     totalUpdated += r.updated;
   }
 
-  port.postMessage({
+  send({
     type: "done",
     seen: totalSeen,
     inserted: totalInserted,
@@ -112,20 +132,42 @@ async function runSync(port) {
   });
 }
 
-async function upload(serverUrl, token, bookmarks) {
-  const res = await fetch(`${serverUrl}/api/ingest`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ bookmarks }),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Ingest failed: ${res.status} ${text.slice(0, 200)}`);
+async function upload(serverUrl, token, bookmarks, onLog) {
+  const MAX_ATTEMPTS = 5;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`${serverUrl}/api/ingest`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookmarks }),
+      });
+      if (res.status >= 400 && res.status < 500 && res.status !== 408) {
+        // Auth failures and validation errors won't get better with retry.
+        const text = await res.text().catch(() => "");
+        throw new Error(`Ingest failed: ${res.status} ${text.slice(0, 200)}`);
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Ingest ${res.status}: ${text.slice(0, 200)}`);
+      }
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === MAX_ATTEMPTS) break;
+      // Don't retry on hard client errors (thrown with "Ingest failed:" prefix).
+      if (String(err?.message ?? "").startsWith("Ingest failed:")) throw err;
+      const delay = 1000 * Math.pow(2, attempt - 1) + Math.random() * 500;
+      onLog?.(
+        `Upload failed (${attempt}/${MAX_ATTEMPTS}): ${err?.message ?? err}. Retrying in ${(delay / 1000).toFixed(1)}s...`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
   }
-  return res.json();
+  throw lastErr ?? new Error("Upload failed");
 }
 
 async function hasXSession() {

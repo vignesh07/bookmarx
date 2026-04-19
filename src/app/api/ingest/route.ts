@@ -27,6 +27,19 @@ export function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  try {
+    return await handlePost(req);
+  } catch (err) {
+    // Catch-all so 500s still carry CORS headers — otherwise the browser
+    // shows "No 'Access-Control-Allow-Origin' header" to the extension
+    // and the real error is invisible.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("ingest error:", err);
+    return jsonResponse({ error: "ingest failed", message }, { status: 500 });
+  }
+}
+
+async function handlePost(req: Request) {
   const token = process.env.INGEST_TOKEN;
   if (!token) {
     return jsonResponse(
