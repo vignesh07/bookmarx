@@ -64,6 +64,8 @@ export const media = pgTable(
     height: integer("height"),
     altText: text("alt_text"),
     position: integer("position").default(0).notNull(),
+    videoUrl: text("video_url"),
+    durationMs: integer("duration_ms"),
   },
   (t) => [index("media_bookmark_idx").on(t.bookmarkId)],
 );
@@ -81,6 +83,14 @@ export const links = pgTable(
     description: text("description"),
     siteName: text("site_name"),
     imageUrl: text("image_url"),
+    articleHtml: text("article_html"),
+    articleText: text("article_text"),
+    articleByline: text("article_byline"),
+    articleExcerpt: text("article_excerpt"),
+    articleLeadImage: text("article_lead_image"),
+    articleWordCount: integer("article_word_count"),
+    articleFetchedAt: timestamp("article_fetched_at", { withTimezone: true }),
+    articleError: text("article_error"),
   },
   (t) => [index("links_bookmark_idx").on(t.bookmarkId)],
 );

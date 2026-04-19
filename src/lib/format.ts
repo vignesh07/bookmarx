@@ -51,3 +51,13 @@ export function readingTimeMinutes(text: string): number {
   const words = text.trim().split(/\s+/).length;
   return Math.max(1, Math.round(words / 230));
 }
+
+// X auto-appends `https://t.co/…` tokens at the end of tweet text for
+// every attached photo, video, or card. In a reader view those are
+// redundant with the media/link card that renders below, so drop
+// trailing t.co URLs.
+const TRAILING_TCO = /(?:\s*https?:\/\/t\.co\/\w+\s*)+$/i;
+
+export function cleanTweetText(text: string): string {
+  return text.replace(TRAILING_TCO, "").trimEnd();
+}

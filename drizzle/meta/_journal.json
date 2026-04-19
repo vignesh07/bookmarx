@@ -8,6 +8,13 @@
       "when": 1776578273268,
       "tag": "0000_plain_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776629718329,
+      "tag": "0001_fantastic_exodus",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,8 @@ export function transformBookmark(raw) {
     height: m.original_info?.height ?? null,
     altText: m.ext_alt_text ?? null,
     position: i,
+    videoUrl: pickBestVideoVariant(m.video_info?.variants),
+    durationMs: m.video_info?.duration_millis ?? null,
   }));
 
   const links = (entities.urls ?? []).map((u) => ({
@@ -95,4 +97,15 @@ function kindFor(t) {
   if (t === "video") return "video";
   if (t === "animated_gif") return "animated_gif";
   return "photo";
+}
+
+// X returns multiple MP4 variants at different bitrates plus an HLS
+// stream (.m3u8). We prefer the highest-bitrate MP4 for direct <video>
+// playback — browsers play MP4 natively without hls.js.
+function pickBestVideoVariant(variants) {
+  if (!variants?.length) return null;
+  const mp4s = variants.filter((v) => v.content_type === "video/mp4");
+  if (mp4s.length === 0) return null;
+  return mp4s.reduce((a, b) => ((a.bitrate ?? 0) > (b.bitrate ?? 0) ? a : b))
+    .url;
 }

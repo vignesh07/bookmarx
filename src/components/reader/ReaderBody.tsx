@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { Heart, Repeat2, MessageCircle } from "lucide-react";
-import { compactNumber, formatDate, readingTimeMinutes } from "@/lib/format";
+import {
+  cleanTweetText,
+  compactNumber,
+  formatDate,
+  readingTimeMinutes,
+} from "@/lib/format";
 import type { BookmarkDetail } from "@/lib/queries";
+import { Media } from "./Media";
 
 export function ReaderBody({ bookmark }: { bookmark: BookmarkDetail }) {
-  const minutes = readingTimeMinutes(bookmark.text);
+  const bodyText = cleanTweetText(bookmark.text);
+  const minutes = readingTimeMinutes(bodyText);
   const hasThread = bookmark.thread.length > 1;
 
   return (
@@ -50,7 +57,7 @@ export function ReaderBody({ bookmark }: { bookmark: BookmarkDetail }) {
           {bookmark.thread.map((post, i) => (
             <ThreadPost
               key={post.id}
-              text={post.text}
+              text={cleanTweetText(post.text)}
               postedAt={post.postedAt}
               position={i + 1}
               total={bookmark.thread.length}
@@ -59,23 +66,11 @@ export function ReaderBody({ bookmark }: { bookmark: BookmarkDetail }) {
         </div>
       ) : (
         <div className="font-serif text-[20px] leading-[1.55] tracking-[-0.003em] text-ink whitespace-pre-wrap">
-          {bookmark.text}
+          {bodyText}
         </div>
       )}
 
-      {bookmark.media.length > 0 && (
-        <div className="mt-8 grid grid-cols-2 gap-3">
-          {bookmark.media.map((m) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={m.id}
-              src={m.previewUrl ?? m.url}
-              alt={m.altText ?? ""}
-              className="aspect-[4/3] w-full rounded-md object-cover"
-            />
-          ))}
-        </div>
-      )}
+      <Media items={bookmark.media} />
 
       {bookmark.links.length > 0 && (
         <section className="mt-12 flex flex-col gap-3">

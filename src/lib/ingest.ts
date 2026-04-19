@@ -20,6 +20,8 @@ export const IngestMedia = z.object({
   height: z.number().int().optional().nullable(),
   altText: z.string().optional().nullable(),
   position: z.number().int().default(0),
+  videoUrl: z.string().url().optional().nullable(),
+  durationMs: z.number().int().optional().nullable(),
 });
 
 export const IngestLink = z.object({
@@ -139,6 +141,8 @@ export async function ingestBookmarks(items: IngestBookmarkInput[]) {
           height: m.height ?? null,
           altText: m.altText ?? null,
           position: m.position,
+          videoUrl: m.videoUrl ?? null,
+          durationMs: m.durationMs ?? null,
         })),
       );
     }
