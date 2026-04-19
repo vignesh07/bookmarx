@@ -32,9 +32,7 @@ session. Nothing in the cloud, no accounts, no telemetry, no SaaS.
 
 ### Article reader
 
-![Bookmarx article reader]<img width="1485" height="774" alt="image" src="https://github.com/user-attachments/assets/c8bc69ee-614b-411c-af8c-6dad32bcd96b" />
-
-)
+<img width="1485" height="774" alt="image" src="https://github.com/user-attachments/assets/c8bc69ee-614b-411c-af8c-6dad32bcd96b" />
 
 ## Stack
 
