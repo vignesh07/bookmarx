@@ -17,21 +17,53 @@ export type LibraryFilter = {
   type?: "thread" | "media" | "links" | "long";
 };
 
-export async function getLibraryRows(filter: LibraryFilter = {}, limit = 50) {
+export const PAGE_SIZE = 50;
+
+export async function getLibraryRows(
+  filter: LibraryFilter = {},
+  { limit = PAGE_SIZE, offset = 0 }: { limit?: number; offset?: number } = {},
+) {
   const where = [isNull(bookmarks.deletedAt)];
   if (filter.unreadOnly) where.push(eq(bookmarks.isRead, false));
   if (filter.favoritesOnly) where.push(eq(bookmarks.isFavorite, true));
 
-  let bookmarkIds: string[] | undefined;
   if (filter.collectionId) {
     const rows = await db
       .select({ id: bookmarkCollections.bookmarkId })
       .from(bookmarkCollections)
       .where(eq(bookmarkCollections.collectionId, filter.collectionId));
-    bookmarkIds = rows.map((r) => r.id);
-    if (bookmarkIds.length === 0) return [];
-    where.push(inArray(bookmarks.id, bookmarkIds));
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) return { rows: [], total: 0 };
+    where.push(inArray(bookmarks.id, ids));
   }
+
+  if (filter.type === "thread") {
+    where.push(sql`${bookmarks.threadRootId} is not null`);
+  } else if (filter.type === "media") {
+    where.push(
+      sql`exists (select 1 from ${media} where ${media.bookmarkId} = ${bookmarks.id})`,
+    );
+  } else if (filter.type === "links") {
+    where.push(
+      sql`exists (select 1 from ${links} where ${links.bookmarkId} = ${bookmarks.id})`,
+    );
+  } else if (filter.type === "long") {
+    where.push(
+      sql`(
+        ${bookmarks.threadRootId} is not null
+        or exists (
+          select 1 from ${links}
+          where ${links.bookmarkId} = ${bookmarks.id}
+            and ${links.articleWordCount} > 500
+        )
+      )`,
+    );
+  }
+
+  const [totalRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(bookmarks)
+    .where(and(...where));
 
   const rows = await db
     .select({
@@ -42,9 +74,10 @@ export async function getLibraryRows(filter: LibraryFilter = {}, limit = 50) {
     .innerJoin(authors, eq(bookmarks.authorId, authors.id))
     .where(and(...where))
     .orderBy(desc(bookmarks.bookmarkedAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { rows: [], total: totalRow?.n ?? 0 };
 
   const ids = rows.map((r) => r.bookmark.id);
   const [mediaRows, linkRows, collectionRows] = await Promise.all([
@@ -63,20 +96,25 @@ export async function getLibraryRows(filter: LibraryFilter = {}, limit = 50) {
       .where(inArray(bookmarkCollections.bookmarkId, ids)),
   ]);
 
-  return rows.map((r) => ({
-    ...r.bookmark,
-    author: r.author,
-    media: mediaRows
-      .filter((m) => m.bookmarkId === r.bookmark.id)
-      .sort((a, b) => a.position - b.position),
-    links: linkRows.filter((l) => l.bookmarkId === r.bookmark.id),
-    collections: collectionRows
-      .filter((c) => c.bookmarkId === r.bookmark.id)
-      .map((c) => c.collection),
-  }));
+  return {
+    rows: rows.map((r) => ({
+      ...r.bookmark,
+      author: r.author,
+      media: mediaRows
+        .filter((m) => m.bookmarkId === r.bookmark.id)
+        .sort((a, b) => a.position - b.position),
+      links: linkRows.filter((l) => l.bookmarkId === r.bookmark.id),
+      collections: collectionRows
+        .filter((c) => c.bookmarkId === r.bookmark.id)
+        .map((c) => c.collection),
+    })),
+    total: totalRow?.n ?? 0,
+  };
 }
 
-export type LibraryRow = Awaited<ReturnType<typeof getLibraryRows>>[number];
+export type LibraryRow = Awaited<
+  ReturnType<typeof getLibraryRows>
+>["rows"][number];
 
 export async function getCollections() {
   return db

@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { ListFilter, Rows3, LayoutGrid } from "lucide-react";
 
-type Chip = { id: string; label: string; count?: number };
+type Chip = { id: string; label: string; count?: number; href: string };
 
 type Props = {
   active: string;
@@ -59,13 +60,13 @@ export function FilterChips({ active, chips }: Props) {
       {chips.map((chip) => {
         const isActive = chip.id === active;
         return (
-          <button
+          <Link
             key={chip.id}
-            type="button"
-            className={`flex items-center gap-1.5 rounded-full px-3 py-[5px] text-[12px] ${
+            href={chip.href}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-[5px] text-[12px] transition ${
               isActive
                 ? "bg-ink text-paper font-medium"
-                : "border border-hairline-strong text-ink"
+                : "border border-hairline-strong text-ink hover:border-ink"
             }`}
           >
             <span>{chip.label}</span>
@@ -76,7 +77,7 @@ export function FilterChips({ active, chips }: Props) {
                 {chip.count.toLocaleString()}
               </span>
             )}
-          </button>
+          </Link>
         );
       })}
     </div>
