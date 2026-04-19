@@ -3,7 +3,7 @@
   "name": "Bookmarx Sync",
   "version": "0.1.0",
   "description": "Pull your X bookmarks into your self-hosted Bookmarx instance.",
-  "permissions": ["storage", "cookies"],
+  "permissions": ["storage", "cookies", "webRequest", "tabs"],
   "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
   "background": {
     "service_worker": "src/background.js",

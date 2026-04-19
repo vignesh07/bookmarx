@@ -1,10 +1,13 @@
 // Background service worker. Receives "start" from popup, scrapes
 // X's internal Bookmarks GraphQL endpoint using the user's session
-// cookies, batches results, and POSTs them to the user's Bookmarx
-// server.
+// cookies + a sniffed query ID, batches results, and POSTs them to
+// the user's Bookmarx server.
 
 import { fetchAllBookmarks } from "./xapi.js";
 import { transformBookmark } from "./transform.js";
+import { installSniffer, captureNow, getCapturedConfig } from "./sniff.js";
+
+installSniffer();
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sync") return;
@@ -34,6 +37,12 @@ async function runSync(port) {
     );
   }
 
+  port.postMessage({ type: "progress", text: "Capturing X API config..." });
+  let config = await getCapturedConfig();
+  if (!config) {
+    config = await captureNow();
+  }
+
   let totalSeen = 0;
   let totalInserted = 0;
   let totalUpdated = 0;
@@ -41,7 +50,7 @@ async function runSync(port) {
   const BATCH_SIZE = 50;
   let batch = [];
 
-  for await (const raw of fetchAllBookmarks(credentials)) {
+  for await (const raw of fetchAllBookmarks(credentials, config)) {
     const transformed = transformBookmark(raw);
     if (!transformed) continue;
     batch.push(transformed);

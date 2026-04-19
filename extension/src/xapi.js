@@ -1,38 +1,11 @@
-// Wrapper around X's internal Bookmarks GraphQL endpoint. The
-// endpoint ID and feature flags rotate occasionally — when a sync
-// starts returning empty results, refresh these by opening
-// x.com/i/bookmarks, watching the network tab, and copying the
-// latest values from the Bookmarks request.
+// Wrapper around X's internal Bookmarks GraphQL endpoint. The query
+// ID and feature flags are sniffed from the user's own browser by
+// sniff.js — no need to hand-update them when X rotates values.
 
-const BOOKMARKS_QUERY_ID = "qFE_qSO_TX0vDCSmgLWb1g";
 const BOOKMARKS_OP = "Bookmarks";
 
-const FEATURES = {
-  graphql_timeline_v2_bookmark_timeline: true,
-  rweb_lists_timeline_redesign_enabled: true,
-  responsive_web_graphql_exclude_directive_enabled: true,
-  verified_phone_label_enabled: false,
-  creator_subscriptions_tweet_preview_api_enabled: true,
-  responsive_web_graphql_timeline_navigation_enabled: true,
-  responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
-  c9s_tweet_anatomy_moderator_badge_enabled: true,
-  tweetypie_unmention_optimization_enabled: true,
-  responsive_web_edit_tweet_api_enabled: true,
-  graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
-  view_counts_everywhere_api_enabled: true,
-  longform_notetweets_consumption_enabled: true,
-  responsive_web_twitter_article_tweet_consumption_enabled: true,
-  tweet_awards_web_tipping_enabled: false,
-  freedom_of_speech_not_reach_fetch_enabled: true,
-  standardized_nudges_misinfo: true,
-  tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
-  rweb_video_timestamps_enabled: true,
-  longform_notetweets_rich_text_read_enabled: true,
-  longform_notetweets_inline_media_enabled: true,
-  responsive_web_enhance_cards_enabled: false,
-};
-
-export async function* fetchAllBookmarks({ csrfToken }) {
+export async function* fetchAllBookmarks({ csrfToken }, config) {
+  const { queryId, features } = config;
   let cursor = null;
   let pageCount = 0;
   const PAGE_SIZE = 100;
@@ -47,10 +20,10 @@ export async function* fetchAllBookmarks({ csrfToken }) {
     };
 
     const url = new URL(
-      `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/${BOOKMARKS_OP}`,
+      `https://x.com/i/api/graphql/${queryId}/${BOOKMARKS_OP}`,
     );
     url.searchParams.set("variables", JSON.stringify(variables));
-    url.searchParams.set("features", JSON.stringify(FEATURES));
+    url.searchParams.set("features", features);
 
     const res = await fetch(url.toString(), {
       method: "GET",
@@ -98,7 +71,9 @@ export async function* fetchAllBookmarks({ csrfToken }) {
 
 function extractEntries(json) {
   const instructions =
-    json?.data?.bookmark_timeline_v2?.timeline?.instructions ?? [];
+    json?.data?.bookmark_timeline_v2?.timeline?.instructions ??
+    json?.data?.bookmark_timeline?.timeline?.instructions ??
+    [];
   const tweets = [];
   let nextCursor = null;
   for (const inst of instructions) {

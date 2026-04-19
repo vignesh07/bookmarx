@@ -20,13 +20,8 @@ tier. Bookmarks are uploaded to `/api/ingest` on your Bookmarx
 server in batches of 50 with a small delay between pages to stay
 under rate limits.
 
-## When the endpoint rotates
-
-X rotates GraphQL query IDs and feature flags every few months. When
-syncs start failing or returning empty pages:
-
-1. Open https://x.com/i/bookmarks in Chrome with DevTools → Network
-2. Scroll the page to trigger a request
-3. Find the `Bookmarks` request and copy its query ID from the URL
-4. Update `BOOKMARKS_QUERY_ID` and `FEATURES` in `src/xapi.js`
-5. Reload the extension
+The query ID and feature flags X embeds in its requests rotate every
+few months. The extension self-updates by silently sniffing your own
+browser for the live values whenever you visit `x.com/i/bookmarks`,
+and on first sync it briefly opens that page in a background tab to
+capture them. No DevTools dance required.
