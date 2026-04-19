@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, Repeat2, MessageCircle } from "lucide-react";
+import { Heart, Repeat2, MessageCircle, BookOpen, ExternalLink } from "lucide-react";
 import {
   cleanTweetText,
   compactNumber,
@@ -77,39 +77,74 @@ export function ReaderBody({ bookmark }: { bookmark: BookmarkDetail }) {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle">
             Links
           </h2>
-          {bookmark.links.map((l) => (
-            <a
-              key={l.id}
-              href={l.expandedUrl ?? l.url}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="flex items-start gap-3 rounded-lg border border-hairline bg-surface p-3 hover:border-hairline-strong"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="text-[11px] uppercase tracking-[0.06em] text-subtle">
-                  {l.siteName ?? hostFor(l.expandedUrl ?? l.url)}
-                </div>
-                {l.title && (
-                  <div className="font-serif text-[16px] leading-tight text-ink">
-                    {l.title}
+          {bookmark.links.map((l) => {
+            const href = l.expandedUrl ?? l.url;
+            const readable = Boolean(l.articleHtml) || Boolean(l.title);
+            return (
+              <div
+                key={l.id}
+                className="group relative overflow-hidden rounded-lg border border-hairline bg-surface transition hover:border-hairline-strong"
+              >
+                <Link
+                  href={`/a/${l.id}`}
+                  className="flex items-start gap-3 p-3"
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.06em] text-subtle">
+                      <span>{l.siteName ?? hostFor(href)}</span>
+                      {l.articleHtml && (
+                        <>
+                          <span className="size-[3px] rounded-full bg-[#C5BCA6]" />
+                          <span className="text-accent-rust">
+                            {Math.max(
+                              1,
+                              Math.round((l.articleWordCount ?? 0) / 230),
+                            )}{" "}
+                            min read
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {l.title && (
+                      <div className="font-serif text-[16px] leading-tight text-ink">
+                        {l.title}
+                      </div>
+                    )}
+                    {l.description && (
+                      <p className="line-clamp-2 text-[12.5px] leading-[1.5] text-muted">
+                        {l.description}
+                      </p>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted">
+                      <BookOpen className="size-3" strokeWidth={1.8} />
+                      {l.articleHtml
+                        ? "Read article"
+                        : readable
+                          ? "Open reader"
+                          : "Open link"}
+                    </div>
                   </div>
-                )}
-                {l.description && (
-                  <p className="line-clamp-2 text-[12.5px] leading-[1.5] text-muted">
-                    {l.description}
-                  </p>
-                )}
+                  {l.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={l.imageUrl}
+                      alt=""
+                      className="size-20 shrink-0 rounded-md object-cover"
+                    />
+                  )}
+                </Link>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Open original"
+                  className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md text-subtle opacity-0 transition hover:bg-paper hover:text-ink group-hover:opacity-100"
+                >
+                  <ExternalLink className="size-3.5" strokeWidth={1.8} />
+                </a>
               </div>
-              {l.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={l.imageUrl}
-                  alt=""
-                  className="size-20 shrink-0 rounded-md object-cover"
-                />
-              )}
-            </a>
-          ))}
+            );
+          })}
         </section>
       )}
 
