@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink, RefreshCcw } from "lucide-react";
 import { db } from "@/db/client";
 import { bookmarks, links, authors } from "@/db/schema";
+import { fetchAndParseArticle } from "@/lib/article";
 import { fetchArticle } from "./actions";
 import { ShareBar } from "@/components/reader/ShareBar";
 import { ReadingProgress } from "@/components/reader/ReadingProgress";
@@ -19,6 +20,38 @@ async function getLinkWithBookmark(id: string) {
   return row ?? null;
 }
 
+type LinkRow = NonNullable<Awaited<ReturnType<typeof getLinkWithBookmark>>>["link"];
+
+async function ensureFetched(link: LinkRow): Promise<LinkRow> {
+  if (link.articleHtml) return link;
+  // Don't auto-retry past failures — user can click Retry on the failure page
+  if (link.articleFetchedAt) return link;
+
+  const url = link.expandedUrl ?? link.url;
+  try {
+    const parsed = await fetchAndParseArticle(url);
+    const updates = {
+      articleHtml: parsed.html,
+      articleText: parsed.text,
+      articleByline: parsed.byline,
+      articleExcerpt: parsed.excerpt,
+      articleLeadImage: parsed.leadImage,
+      articleWordCount: parsed.wordCount,
+      articleFetchedAt: new Date(),
+      articleError: null,
+      title: link.title ?? parsed.title,
+      siteName: link.siteName ?? parsed.siteName,
+    };
+    await db.update(links).set(updates).where(eq(links.id, link.id));
+    return { ...link, ...updates };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const updates = { articleFetchedAt: new Date(), articleError: message };
+    await db.update(links).set(updates).where(eq(links.id, link.id));
+    return { ...link, ...updates };
+  }
+}
+
 export default async function ArticlePage({
   params,
 }: {
@@ -29,22 +62,19 @@ export default async function ArticlePage({
   const row = await getLinkWithBookmark(id);
   if (!row) notFound();
 
-  const { link, bookmark, author } = row;
+  const { bookmark, author } = row;
+  const link = await ensureFetched(row.link);
   const canonicalUrl = link.expandedUrl ?? link.url;
 
-  if (link.articleError && !link.articleHtml) {
+  if (!link.articleHtml) {
     return (
       <FailurePage
         linkId={link.id}
         url={canonicalUrl}
         bookmarkId={bookmark.id}
-        error={link.articleError}
+        error={link.articleError ?? "no article content"}
       />
     );
-  }
-
-  if (!link.articleHtml) {
-    return <LoadingPage linkId={link.id} url={canonicalUrl} bookmarkId={bookmark.id} />;
   }
 
   const minutes = Math.max(1, Math.round((link.articleWordCount ?? 0) / 230));
@@ -52,27 +82,11 @@ export default async function ArticlePage({
   return (
     <div className="min-h-screen bg-paper text-ink">
       <ReadingProgress />
-      <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
-        <Link
-          href={`/b/${bookmark.id}`}
-          className="flex items-center gap-2 text-[13px] text-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.8} />
-          Bookmark
-        </Link>
-        <span className="truncate text-[12px] text-subtle">
-          {link.siteName ?? hostFor(canonicalUrl)}
-        </span>
-        <a
-          href={canonicalUrl}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline-strong px-2.5 text-[12px] text-ink hover:bg-surface"
-        >
-          <ExternalLink className="size-3" strokeWidth={1.8} />
-          Original
-        </a>
-      </header>
+      <ArticleHeader
+        bookmarkId={bookmark.id}
+        url={canonicalUrl}
+        siteLabel={link.siteName ?? hostFor(canonicalUrl)}
+      />
 
       <article className="mx-auto max-w-[720px] px-8 pt-14 pb-24">
         <div className="flex flex-col gap-3 pb-10">
@@ -127,64 +141,37 @@ export default async function ArticlePage({
   );
 }
 
-function LoadingPage({
-  linkId,
-  url,
+function ArticleHeader({
   bookmarkId,
+  url,
+  siteLabel,
 }: {
-  linkId: string;
-  url: string;
   bookmarkId: string;
+  url: string;
+  siteLabel?: string;
 }) {
   return (
-    <div className="min-h-screen bg-paper text-ink">
-      <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
-        <Link
-          href={`/b/${bookmarkId}`}
-          className="flex items-center gap-2 text-[13px] text-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.8} />
-          Bookmark
-        </Link>
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline-strong px-2.5 text-[12px] text-ink hover:bg-surface"
-        >
-          <ExternalLink className="size-3" strokeWidth={1.8} />
-          Original
-        </a>
-      </header>
-      <div className="mx-auto max-w-[560px] px-8 pt-24 text-center">
-        <div className="font-serif text-[28px] leading-tight tracking-[-0.01em] text-ink">
-          Fetch this article?
-        </div>
-        <p className="mx-auto mt-4 max-w-[420px] text-[14px] leading-relaxed text-muted">
-          Bookmarx will fetch {hostFor(url)} and run it through a reader
-          extractor, then store the cleaned article here.
-        </p>
-        <form
-          action={fetchArticle.bind(null, linkId)}
-          className="mt-8 flex items-center justify-center gap-3"
-        >
-          <button
-            type="submit"
-            className="rounded-md bg-ink px-4 py-2 text-[13px] font-medium text-paper hover:bg-[#2a221a]"
-          >
-            Fetch and read
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="rounded-md border border-hairline-strong px-4 py-2 text-[13px] text-ink hover:bg-surface"
-          >
-            Open original
-          </a>
-        </form>
-      </div>
-    </div>
+    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
+      <Link
+        href={`/b/${bookmarkId}`}
+        className="flex items-center gap-2 text-[13px] text-muted hover:text-ink"
+      >
+        <ArrowLeft className="size-3.5" strokeWidth={1.8} />
+        Bookmark
+      </Link>
+      {siteLabel && (
+        <span className="truncate text-[12px] text-subtle">{siteLabel}</span>
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="flex h-7 items-center gap-1.5 rounded-md border border-hairline-strong px-2.5 text-[12px] text-ink hover:bg-surface"
+      >
+        <ExternalLink className="size-3" strokeWidth={1.8} />
+        Open original
+      </a>
+    </header>
   );
 }
 
@@ -201,24 +188,7 @@ function FailurePage({
 }) {
   return (
     <div className="min-h-screen bg-paper text-ink">
-      <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-paper/85 px-6 backdrop-blur">
-        <Link
-          href={`/b/${bookmarkId}`}
-          className="flex items-center gap-2 text-[13px] text-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.8} />
-          Bookmark
-        </Link>
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-hairline-strong px-2.5 text-[12px] text-ink hover:bg-surface"
-        >
-          <ExternalLink className="size-3" strokeWidth={1.8} />
-          Original
-        </a>
-      </header>
+      <ArticleHeader bookmarkId={bookmarkId} url={url} />
       <div className="mx-auto max-w-[520px] px-8 pt-24 text-center">
         <div className="font-serif text-[24px] leading-tight tracking-[-0.01em] text-ink">
           Couldn&apos;t extract the article
