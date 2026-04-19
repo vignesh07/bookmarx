@@ -1,0 +1,98 @@
+// Translates X's GraphQL tweet shape into the Bookmarx ingest shape.
+// X's payload is deeply nested and inconsistently shaped (note tweets,
+// retweets, "TweetWithVisibilityResults" wrappers, etc) — unwrap once
+// here so the rest of the codebase only sees the flat shape.
+
+export function transformBookmark(raw) {
+  const tweet = unwrap(raw);
+  if (!tweet) return null;
+
+  const legacy = tweet.legacy ?? {};
+  const userResult = tweet.core?.user_results?.result;
+  const user = userResult?.legacy ?? {};
+  const userId = userResult?.rest_id ?? legacy.user_id_str;
+  if (!userId) return null;
+
+  const tweetId = tweet.rest_id ?? legacy.id_str;
+  if (!tweetId) return null;
+
+  const noteText = tweet.note_tweet?.note_tweet_results?.result?.text;
+  const text = noteText ?? legacy.full_text ?? legacy.text ?? "";
+
+  const entities = legacy.entities ?? {};
+  const mediaList = (legacy.extended_entities?.media ?? []).map((m, i) => ({
+    id: m.id_str ?? `${tweetId}-m${i}`,
+    kind: kindFor(m.type),
+    url: m.media_url_https ?? m.media_url,
+    previewUrl: m.media_url_https ?? null,
+    width: m.original_info?.width ?? null,
+    height: m.original_info?.height ?? null,
+    altText: m.ext_alt_text ?? null,
+    position: i,
+  }));
+
+  const links = (entities.urls ?? []).map((u) => ({
+    url: u.url,
+    expandedUrl: u.expanded_url,
+    title: null,
+    description: null,
+    siteName: u.display_url?.split("/")[0] ?? null,
+    imageUrl: null,
+  }));
+
+  const card = tweet.card?.legacy?.binding_values;
+  if (card && links.length > 0) {
+    const get = (k) =>
+      card.find((b) => b.key === k)?.value?.string_value ?? null;
+    const title = get("title");
+    const description = get("description");
+    const imageUrl =
+      card.find((b) => b.key === "thumbnail_image_large")?.value?.image_value
+        ?.url ?? get("thumbnail_image_original");
+    if (title) links[0].title = title;
+    if (description) links[0].description = description;
+    if (imageUrl) links[0].imageUrl = imageUrl;
+  }
+
+  return {
+    id: tweetId,
+    author: {
+      id: userId,
+      handle: user.screen_name ?? "unknown",
+      displayName: user.name ?? user.screen_name ?? "Unknown",
+      avatarUrl: user.profile_image_url_https ?? null,
+      verified: Boolean(user.verified || userResult?.is_blue_verified),
+    },
+    text,
+    lang: legacy.lang ?? null,
+    postedAt: legacy.created_at
+      ? new Date(legacy.created_at).toISOString()
+      : new Date().toISOString(),
+    bookmarkedAt: new Date().toISOString(),
+    sourceUrl: `https://x.com/${user.screen_name ?? "i/web"}/status/${tweetId}`,
+    threadRootId: legacy.conversation_id_str ?? null,
+    threadPosition:
+      legacy.conversation_id_str === tweetId ? 0 : null,
+    replyCount: legacy.reply_count ?? 0,
+    repostCount: legacy.retweet_count ?? 0,
+    likeCount: legacy.favorite_count ?? 0,
+    media: mediaList,
+    links,
+    raw,
+  };
+}
+
+function unwrap(result) {
+  if (!result) return null;
+  if (result.__typename === "TweetWithVisibilityResults") {
+    return result.tweet ?? null;
+  }
+  if (result.__typename === "TweetTombstone") return null;
+  return result;
+}
+
+function kindFor(t) {
+  if (t === "video") return "video";
+  if (t === "animated_gif") return "animated_gif";
+  return "photo";
+}
