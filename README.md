@@ -32,11 +32,8 @@ session. Nothing in the cloud, no accounts, no telemetry, no SaaS.
 
 ### Article reader
 
-![Bookmarx article reader](./screenshots/readme/article-reader-desktop.png)
-
-### Mobile library
-
-![Bookmarx mobile library view](./screenshots/readme/library-mobile.png)
+![Bookmarx article reader](<img width="1485" height="774" alt="image" src="https://github.com/user-attachments/assets/9ae0f411-7f28-4beb-bcb7-6653b6278c78" />
+)
 
 ## Stack
 
