@@ -88,22 +88,13 @@
       <h1>Bookmarx Sync</h1>
     </header>
     <main>
-      <label>
-        Server URL
-        <input id="serverUrl" placeholder="https://bookmarx.example.com" />
-      </label>
-      <label>
-        Ingest token
-        <input id="token" type="password" placeholder="paste INGEST_TOKEN" />
-      </label>
-      <div class="row">
-        <button class="secondary" id="saveBtn">Save</button>
-        <button id="syncBtn">Sync now</button>
-      </div>
+      <button id="syncBtn">Sync now</button>
       <div id="status" class="status">Ready.</div>
       <p class="help">
-        Open x.com in another tab and stay signed in.
-        Sync pulls every bookmark, then re-uploads any changes since the last run.
+        Make sure your local Bookmarx server is running on
+        <code>http://localhost:3000</code> and you're signed into x.com
+        in another tab. Sync pulls every bookmark, then re-uploads any
+        changes since the last run.
       </p>
     </main>
     <script src="popup.js"></script>

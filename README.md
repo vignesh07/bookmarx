@@ -4,19 +4,21 @@
 
 ![Bookmarx library](./screenshots/readme/library-list-desktop.png)
 
-A self-hosted organizer, viewer, and reader for your X (Twitter) bookmarks.
-One database, one user, one deploy. No SaaS, no subscriptions, no scraping
-of your data into someone else's product.
+A local-first organizer, viewer, and reader for your X (Twitter) bookmarks.
+Runs on your machine, against your own Postgres, with your own browser
+session. Nothing in the cloud, no accounts, no telemetry, no SaaS.
 
 - **Editorial reader** — serif body text, threads rendered as a connected
   sequence, no chrome.
+- **Inline article reader** — Mozilla Readability extracts the article
+  for any link in a bookmark, so you can read without leaving the app.
 - **Collections** — color-coded, manually managed.
 - **Filters** — unread, favorites, threads, media, links, long reads.
 - **Browser extension** — pulls every bookmark you've ever saved
   (including the >800 the official API can't reach) using your own
   session cookies.
-- **Single tenant by design** — there's no auth, because you're the only
-  one with the URL.
+- **Local only by design** — your bookmarks live in your own Postgres.
+  There's no hosted version, no auth, no remote endpoint.
 
 ## Screenshots
 
@@ -44,16 +46,18 @@ of your data into someone else's product.
 - Zod for input validation
 - Chrome MV3 extension for sync
 
-## Quick start (local)
+## Quick start
+
+You need Node 20+, pnpm, and a Postgres database running locally
+(Postgres.app, Homebrew, or `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`).
 
 ```bash
 # 1. Install deps
 pnpm install
 
-# 2. Copy env template, set DATABASE_URL and INGEST_TOKEN
+# 2. Point at your local Postgres
 cp .env.example .env
-# generate a token:
-openssl rand -hex 32
+# edit .env and set DATABASE_URL
 
 # 3. Push the schema to your database
 pnpm db:push
@@ -65,35 +69,22 @@ pnpm seed
 pnpm dev
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3000>. Then install the
+[browser extension](./extension) and hit **Sync now** to pull your
+bookmarks in.
 
-## Deploy
+## Why local-only?
 
-Bookmarx is a stock Next.js app plus a Postgres database. Anywhere you
-can run `pnpm build && pnpm start` works — Vercel, Fly, Render, a
-Docker host, a VPS. The recipe is the same:
+Bookmarx isn't a service. It's a single-user app you run on your own
+machine, against your own database, using your own X session. There
+is no hosted version, no auth on the server, and no plan to add one —
+the security model is "the server is bound to localhost." That's the
+same reason the ingest endpoint has no token: nothing on the public
+internet should ever talk to it.
 
-1. Provision a Postgres database and copy its connection string into
-   `DATABASE_URL`.
-2. Set `INGEST_TOKEN` to a long random string
-   (`openssl rand -hex 32`). The browser extension uses this to
-   authenticate sync requests.
-3. Run `pnpm db:migrate` once against the database (locally or as a
-   release/predeploy step).
-4. Build and start the app: `pnpm build && pnpm start`.
-5. Open your deploy URL — empty library is expected.
-6. Install the [browser extension](./extension), point it at the URL
-   with the same `INGEST_TOKEN`, and hit **Sync now**.
-
-There is no auth in the app itself — keep the URL private, and rely on
-`INGEST_TOKEN` to gate the write endpoint. If you want a stronger seal,
-put it behind your hosting provider's basic-auth or a Cloudflare
-Access policy.
-
-## Browser extension
-
-See [`extension/README.md`](./extension/README.md) for install instructions
-and how to refresh the X GraphQL endpoint when it rotates.
+If you want to read your bookmarks from another device on your LAN,
+put a tunnel like Tailscale in front of `http://localhost:3000` —
+that's outside the scope of this project but works fine.
 
 ## Project layout
 

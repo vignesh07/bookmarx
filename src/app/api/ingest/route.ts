@@ -54,19 +54,9 @@ export async function POST(req: Request) {
 }
 
 async function handlePost(req: Request) {
-  const token = process.env.INGEST_TOKEN;
-  if (!token) {
-    return jsonResponse(
-      { error: "INGEST_TOKEN not configured on the server" },
-      { status: 500 },
-    );
-  }
-
-  const auth = req.headers.get("authorization") ?? "";
-  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (provided !== token) {
-    return jsonResponse({ error: "unauthorized" }, { status: 401 });
-  }
+  // Bookmarx is a local-only tool: the server is meant to run on
+  // localhost, the extension is meant to talk to it from your own
+  // browser, and there is no authentication. Don't expose this port.
 
   let body: unknown;
   try {

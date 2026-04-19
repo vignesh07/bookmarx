@@ -1,7 +1,4 @@
 const els = {
-  serverUrl: document.getElementById("serverUrl"),
-  token: document.getElementById("token"),
-  saveBtn: document.getElementById("saveBtn"),
   syncBtn: document.getElementById("syncBtn"),
   status: document.getElementById("status"),
 };
@@ -11,27 +8,7 @@ function setStatus(msg, isError = false) {
   els.status.classList.toggle("error", isError);
 }
 
-async function load() {
-  const { serverUrl = "", token = "" } = await chrome.storage.local.get([
-    "serverUrl",
-    "token",
-  ]);
-  els.serverUrl.value = serverUrl;
-  els.token.value = token;
-}
-
-els.saveBtn.addEventListener("click", async () => {
-  const serverUrl = els.serverUrl.value.trim().replace(/\/$/, "");
-  const token = els.token.value.trim();
-  if (!serverUrl || !token) {
-    setStatus("Server URL and token are required.", true);
-    return;
-  }
-  await chrome.storage.local.set({ serverUrl, token });
-  setStatus("Saved.");
-});
-
-els.syncBtn.addEventListener("click", async () => {
+els.syncBtn.addEventListener("click", () => {
   els.syncBtn.disabled = true;
   setStatus("Starting sync...");
   try {
@@ -55,5 +32,3 @@ els.syncBtn.addEventListener("click", async () => {
     els.syncBtn.disabled = false;
   }
 });
-
-load();

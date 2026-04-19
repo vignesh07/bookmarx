@@ -1,6 +1,6 @@
 # Bookmarx Sync — browser extension
 
-Pulls your X bookmarks into your self-hosted Bookmarx instance.
+Pulls your X bookmarks into your local Bookmarx instance.
 
 ## Install (developer mode)
 
@@ -9,14 +9,19 @@ Pulls your X bookmarks into your self-hosted Bookmarx instance.
 3. Click **Load unpacked**
 4. Select this `extension/` directory
 5. Pin the extension to the toolbar
-6. Open it, paste your server URL and `INGEST_TOKEN`, hit **Save**, then **Sync now**
-7. Stay signed in to x.com in another tab during the sync
+6. Make sure your local Bookmarx server is running (`pnpm dev` in the
+   repo root) and you're signed into x.com in another tab
+7. Open the popup and hit **Sync now**
+
+The extension talks to `http://localhost:3000` by default. If you
+run the dev server on another port, edit the `serverUrl` constant in
+`src/background.js` and reload the extension.
 
 ## How it works
 
 The extension scrapes X's internal Bookmarks GraphQL endpoint using
 your own session cookies — no bot account, no API key, no $200/month
-tier. Bookmarks are uploaded to `/api/ingest` on your Bookmarx
+tier. Bookmarks are uploaded to `/api/ingest` on your local Bookmarx
 server in batches of 50 with a small delay between pages to stay
 under rate limits.
 

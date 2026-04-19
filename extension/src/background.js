@@ -70,13 +70,9 @@ function makeSafeSender(port) {
 }
 
 async function runSync(send) {
-  const { serverUrl, token } = await chrome.storage.local.get([
-    "serverUrl",
-    "token",
-  ]);
-  if (!serverUrl || !token) {
-    throw new Error("Configure server URL and token first.");
-  }
+  // Bookmarx assumes the server runs on localhost. If you start `next
+  // dev` on a different port, change this constant.
+  const serverUrl = "http://localhost:3000";
 
   const hasSession = await hasXSession();
   if (!hasSession) {
@@ -105,7 +101,7 @@ async function runSync(send) {
     if (!transformed) continue;
     batch.push(transformed);
     if (batch.length >= BATCH_SIZE) {
-      const r = await upload(serverUrl, token, batch, onLog);
+      const r = await upload(serverUrl, batch, onLog);
       totalSeen += r.seen;
       totalInserted += r.inserted;
       totalUpdated += r.updated;
@@ -118,7 +114,7 @@ async function runSync(send) {
   }
 
   if (batch.length > 0) {
-    const r = await upload(serverUrl, token, batch, onLog);
+    const r = await upload(serverUrl, batch, onLog);
     totalSeen += r.seen;
     totalInserted += r.inserted;
     totalUpdated += r.updated;
@@ -132,17 +128,14 @@ async function runSync(send) {
   });
 }
 
-async function upload(serverUrl, token, bookmarks, onLog) {
+async function upload(serverUrl, bookmarks, onLog) {
   const MAX_ATTEMPTS = 5;
   let lastErr = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(`${serverUrl}/api/ingest`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ bookmarks }),
       });
       if (res.status >= 400 && res.status < 500 && res.status !== 408) {

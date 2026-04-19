@@ -24,7 +24,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Bookmarx — your X bookmarks, finally readable",
   description:
-    "An open-source organizer, viewer, and reader for your X (Twitter) bookmarks. Self-hosted, single tenant, yours.",
+    "A local-first organizer, viewer, and reader for your X (Twitter) bookmarks. Runs on your machine, against your own Postgres.",
 };
 
 export default function RootLayout({
