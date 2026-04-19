@@ -17,6 +17,8 @@ type SearchParams = {
   view?: "unread" | "favorites" | "recent";
   collection?: string;
   type?: "thread" | "media" | "links" | "long";
+  sort?: "newest" | "oldest" | "top";
+  layout?: "list" | "grid";
   page?: string;
 };
 
@@ -27,11 +29,15 @@ export default async function Home({
 }) {
   const sp = await searchParams;
 
+  const sort = sp.sort ?? "newest";
+  const layout = sp.layout ?? "list";
+
   const filter: LibraryFilter = {
     unreadOnly: sp.view === "unread",
     favoritesOnly: sp.view === "favorites",
     collectionId: sp.collection,
     type: sp.type,
+    sort,
   };
 
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
@@ -46,24 +52,39 @@ export default async function Home({
   const activeView = sp.collection ? "collection" : sp.view ?? "all";
   const headerCopy = headerCopyFor(activeView, sp.collection, collections);
 
-  const chipHref = (typeId: string) => {
+  const buildHref = (overrides: Partial<SearchParams>) => {
+    const merged: SearchParams = {
+      view: sp.view,
+      collection: sp.collection,
+      type: sp.type,
+      sort: sp.sort,
+      layout: sp.layout,
+      page: sp.page,
+      ...overrides,
+    };
     const params = new URLSearchParams();
-    if (sp.view) params.set("view", sp.view);
-    if (sp.collection) params.set("collection", sp.collection);
-    if (typeId !== "all") params.set("type", typeId);
+    if (merged.view) params.set("view", merged.view);
+    if (merged.collection) params.set("collection", merged.collection);
+    if (merged.type) params.set("type", merged.type);
+    if (merged.sort && merged.sort !== "newest") params.set("sort", merged.sort);
+    if (merged.layout && merged.layout !== "list")
+      params.set("layout", merged.layout);
+    if (merged.page && merged.page !== "1") params.set("page", merged.page);
     const qs = params.toString();
     return qs ? `/?${qs}` : "/";
   };
 
-  const pageHref = (n: number) => {
-    const params = new URLSearchParams();
-    if (sp.view) params.set("view", sp.view);
-    if (sp.collection) params.set("collection", sp.collection);
-    if (sp.type) params.set("type", sp.type);
-    if (n > 1) params.set("page", String(n));
-    const qs = params.toString();
-    return qs ? `/?${qs}` : "/";
-  };
+  const chipHref = (typeId: string) =>
+    buildHref({ type: typeId === "all" ? undefined : (typeId as SearchParams["type"]), page: undefined });
+
+  const pageHref = (n: number) =>
+    buildHref({ page: n > 1 ? String(n) : undefined });
+
+  const sortHref = (s: SearchParams["sort"]) =>
+    buildHref({ sort: s, page: undefined });
+
+  const layoutHref = (l: SearchParams["layout"]) =>
+    buildHref({ layout: l });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -90,21 +111,39 @@ export default async function Home({
               { id: "links", label: "Links", href: chipHref("links") },
               { id: "long", label: "Long reads", href: chipHref("long") },
             ]}
+            sort={sort}
+            sortHref={sortHref}
+            layout={layout}
+            layoutHref={layoutHref}
           />
           <Suspense>
-            <div className="px-12 pb-16">
+            <div className="pb-16">
               {rows.length === 0 ? (
                 <EmptyState />
               ) : (
                 <>
-                  {rows.map((row) => (
-                    <BookmarkCard key={row.id} row={row} />
-                  ))}
-                  <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    hrefFor={pageHref}
-                  />
+                  <div
+                    className={
+                      layout === "grid"
+                        ? "grid grid-cols-1 gap-4 px-12 md:grid-cols-2 xl:grid-cols-3"
+                        : "px-12"
+                    }
+                  >
+                    {rows.map((row) => (
+                      <BookmarkCard
+                        key={row.id}
+                        row={row}
+                        layout={layout}
+                      />
+                    ))}
+                  </div>
+                  <div className="px-12">
+                    <Pagination
+                      page={page}
+                      totalPages={totalPages}
+                      hrefFor={pageHref}
+                    />
+                  </div>
                 </>
               )}
             </div>

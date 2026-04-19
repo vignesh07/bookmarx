@@ -8,13 +8,16 @@ import {
   links,
   syncRuns,
 } from "@/db/schema";
-import { desc, eq, sql, and, isNull, inArray } from "drizzle-orm";
+import { asc, desc, eq, sql, and, isNull, inArray } from "drizzle-orm";
+
+export type LibrarySort = "newest" | "oldest" | "top";
 
 export type LibraryFilter = {
   collectionId?: string;
   unreadOnly?: boolean;
   favoritesOnly?: boolean;
   type?: "thread" | "media" | "links" | "long";
+  sort?: LibrarySort;
 };
 
 export const PAGE_SIZE = 50;
@@ -65,6 +68,13 @@ export async function getLibraryRows(
     .from(bookmarks)
     .where(and(...where));
 
+  const orderBy =
+    filter.sort === "oldest"
+      ? asc(bookmarks.bookmarkedAt)
+      : filter.sort === "top"
+        ? desc(bookmarks.likeCount)
+        : desc(bookmarks.bookmarkedAt);
+
   const rows = await db
     .select({
       bookmark: bookmarks,
@@ -73,7 +83,7 @@ export async function getLibraryRows(
     .from(bookmarks)
     .innerJoin(authors, eq(bookmarks.authorId, authors.id))
     .where(and(...where))
-    .orderBy(desc(bookmarks.bookmarkedAt))
+    .orderBy(orderBy)
     .limit(limit)
     .offset(offset);
 
