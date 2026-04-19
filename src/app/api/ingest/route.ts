@@ -33,9 +33,23 @@ export async function POST(req: Request) {
     // Catch-all so 500s still carry CORS headers — otherwise the browser
     // shows "No 'Access-Control-Allow-Origin' header" to the extension
     // and the real error is invisible.
-    const message = err instanceof Error ? err.message : String(err);
     console.error("ingest error:", err);
-    return jsonResponse({ error: "ingest failed", message }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    // postgres-js surfaces the actual constraint/field via .detail — the
+    // default .message is just the parameterized SQL template, which is
+    // useless for diagnosis.
+    const detail =
+      err && typeof err === "object" && "detail" in err
+        ? String((err as { detail: unknown }).detail)
+        : undefined;
+    const constraint =
+      err && typeof err === "object" && "constraint_name" in err
+        ? String((err as { constraint_name: unknown }).constraint_name)
+        : undefined;
+    return jsonResponse(
+      { error: "ingest failed", message, detail, constraint },
+      { status: 500 },
+    );
   }
 }
 

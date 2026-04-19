@@ -125,9 +125,12 @@ export async function ingestBookmarks(items: IngestBookmarkInput[]) {
 
     await db.delete(media).where(sql`${media.bookmarkId} = ${b.id}`);
     if (b.media.length > 0) {
+      // Bookmark-scope the PK: X's media id_str is shared across tweets
+      // (quote-retweet of a tweet with the same photo attached), so using
+      // it directly causes primary-key collisions between bookmarks.
       await db.insert(media).values(
-        b.media.map((m) => ({
-          id: m.id,
+        b.media.map((m, i) => ({
+          id: `${b.id}:m${i}`,
           bookmarkId: b.id,
           kind: m.kind,
           url: m.url,
