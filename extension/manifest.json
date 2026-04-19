@@ -12,8 +12,5 @@
   "action": {
     "default_popup": "src/popup.html",
     "default_title": "Bookmarx"
-  },
-  "icons": {
-    "128": "icon.png"
   }
 }
