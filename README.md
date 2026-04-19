@@ -47,16 +47,28 @@ pnpm dev
 
 Open <http://localhost:3000>.
 
-## Deploy to Railway
+## Deploy
 
-1. Click the deploy button (or fork this repo and connect it manually).
-2. Add a Postgres database from Railway's marketplace; Railway sets
-   `DATABASE_URL` automatically.
-3. Add an `INGEST_TOKEN` env var (generate with `openssl rand -hex 32`).
-4. The first build runs `pnpm db:migrate` automatically.
-5. Visit your Railway URL — empty library is expected.
-6. Install the [browser extension](./extension), point it at your URL
+Bookmarx is a stock Next.js app plus a Postgres database. Anywhere you
+can run `pnpm build && pnpm start` works — Vercel, Fly, Render, a
+Docker host, a VPS. The recipe is the same:
+
+1. Provision a Postgres database and copy its connection string into
+   `DATABASE_URL`.
+2. Set `INGEST_TOKEN` to a long random string
+   (`openssl rand -hex 32`). The browser extension uses this to
+   authenticate sync requests.
+3. Run `pnpm db:migrate` once against the database (locally or as a
+   release/predeploy step).
+4. Build and start the app: `pnpm build && pnpm start`.
+5. Open your deploy URL — empty library is expected.
+6. Install the [browser extension](./extension), point it at the URL
    with the same `INGEST_TOKEN`, and hit **Sync now**.
+
+There is no auth in the app itself — keep the URL private, and rely on
+`INGEST_TOKEN` to gate the write endpoint. If you want a stronger seal,
+put it behind your hosting provider's basic-auth or a Cloudflare
+Access policy.
 
 ## Browser extension
 
