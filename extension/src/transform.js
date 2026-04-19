@@ -9,7 +9,14 @@ export function transformBookmark(raw) {
 
   const legacy = tweet.legacy ?? {};
   const userResult = tweet.core?.user_results?.result;
-  const user = userResult?.legacy ?? {};
+  const userLegacy = userResult?.legacy ?? {};
+  // X moved screen_name/name out of `legacy` into `core` in 2024 — read
+  // from there first and fall back to legacy for older payloads.
+  const userCore = userResult?.core ?? {};
+  const screenName = userCore.screen_name ?? userLegacy.screen_name ?? null;
+  const displayName = userCore.name ?? userLegacy.name ?? screenName;
+  const avatarUrl =
+    userResult?.avatar?.image_url ?? userLegacy.profile_image_url_https ?? null;
   const userId = userResult?.rest_id ?? legacy.user_id_str;
   if (!userId) return null;
 
@@ -60,10 +67,10 @@ export function transformBookmark(raw) {
     id: tweetId,
     author: {
       id: userId,
-      handle: user.screen_name ?? "unknown",
-      displayName: user.name ?? user.screen_name ?? "Unknown",
-      avatarUrl: user.profile_image_url_https ?? null,
-      verified: Boolean(user.verified || userResult?.is_blue_verified),
+      handle: screenName ?? "unknown",
+      displayName: displayName ?? "Unknown",
+      avatarUrl,
+      verified: Boolean(userLegacy.verified || userResult?.is_blue_verified),
     },
     text,
     lang: legacy.lang ?? null,
@@ -71,7 +78,7 @@ export function transformBookmark(raw) {
       ? new Date(legacy.created_at).toISOString()
       : new Date().toISOString(),
     bookmarkedAt: new Date().toISOString(),
-    sourceUrl: `https://x.com/${user.screen_name ?? "i/web"}/status/${tweetId}`,
+    sourceUrl: `https://x.com/${screenName ?? "i/web"}/status/${tweetId}`,
     threadRootId: legacy.conversation_id_str ?? null,
     threadPosition:
       legacy.conversation_id_str === tweetId ? 0 : null,
