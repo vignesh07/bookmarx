@@ -44,18 +44,23 @@ async function graphqlRequest({ queryId, features, variables }) {
   url.searchParams.set("variables", JSON.stringify(variables));
   url.searchParams.set("features", features);
 
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      authorization: `Bearer ${BEARER_TOKEN}`,
-      "content-type": "application/json",
-      "x-csrf-token": csrfToken,
-      "x-twitter-active-user": "yes",
-      "x-twitter-auth-type": "OAuth2Session",
-      "x-twitter-client-language": "en",
-    },
-  });
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        authorization: `Bearer ${BEARER_TOKEN}`,
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken,
+        "x-twitter-active-user": "yes",
+        "x-twitter-auth-type": "OAuth2Session",
+        "x-twitter-client-language": "en",
+      },
+    });
+  } catch (err) {
+    return { error: "network_error", message: String(err?.message ?? err) };
+  }
 
   if (res.status === 429) return { error: "rate_limited", status: 429 };
   if (res.status === 401 || res.status === 403) {
@@ -70,7 +75,12 @@ async function graphqlRequest({ queryId, features, variables }) {
     };
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    return { error: "network_error", message: String(err?.message ?? err) };
+  }
   if (data?.errors?.some((e) => e.code === 88)) {
     return { error: "rate_limited", status: 200 };
   }
