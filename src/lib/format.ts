@@ -1,0 +1,53 @@
+const RTF = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 60 * 60 * 24 * 365],
+  ["month", 60 * 60 * 24 * 30],
+  ["week", 60 * 60 * 24 * 7],
+  ["day", 60 * 60 * 24],
+  ["hour", 60 * 60],
+  ["minute", 60],
+  ["second", 1],
+];
+
+export function relativeTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const seconds = Math.round((d.getTime() - Date.now()) / 1000);
+  for (const [unit, secondsInUnit] of UNITS) {
+    if (Math.abs(seconds) >= secondsInUnit || unit === "second") {
+      return RTF.format(Math.round(seconds / secondsInUnit), unit);
+    }
+  }
+  return "just now";
+}
+
+const COMPACT = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export function compactNumber(n: number): string {
+  return COMPACT.format(n);
+}
+
+const FULL = new Intl.NumberFormat("en");
+
+export function formatNumber(n: number): string {
+  return FULL.format(n);
+}
+
+const DATE = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+export function formatDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return DATE.format(d);
+}
+
+export function readingTimeMinutes(text: string): number {
+  const words = text.trim().split(/\s+/).length;
+  return Math.max(1, Math.round(words / 230));
+}
