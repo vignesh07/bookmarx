@@ -24,7 +24,8 @@ export default async function ArticlePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const id = decodeURIComponent(rawId);
   const row = await getLinkWithBookmark(id);
   if (!row) notFound();
 

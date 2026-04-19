@@ -7,10 +7,11 @@ import { links } from "@/db/schema";
 import { fetchAndParseArticle } from "@/lib/article";
 
 export async function fetchArticle(linkId: string) {
+  const decodedId = decodeURIComponent(linkId);
   const [link] = await db
     .select()
     .from(links)
-    .where(eq(links.id, linkId))
+    .where(eq(links.id, decodedId))
     .limit(1);
 
   if (!link) throw new Error("link not found");
@@ -33,7 +34,7 @@ export async function fetchArticle(linkId: string) {
         title: link.title ?? parsed.title,
         siteName: link.siteName ?? parsed.siteName,
       })
-      .where(eq(links.id, linkId));
+      .where(eq(links.id, decodedId));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await db
@@ -42,8 +43,8 @@ export async function fetchArticle(linkId: string) {
         articleFetchedAt: new Date(),
         articleError: message,
       })
-      .where(eq(links.id, linkId));
+      .where(eq(links.id, decodedId));
   }
 
-  redirect(`/a/${linkId}`);
+  redirect(`/a/${encodeURIComponent(decodedId)}`);
 }
