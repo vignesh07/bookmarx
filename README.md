@@ -2,6 +2,8 @@
 
 > Your X bookmarks, finally readable.
 
+![Bookmarx library](./screenshots/readme/library-list-desktop.png)
+
 A self-hosted organizer, viewer, and reader for your X (Twitter) bookmarks.
 One database, one user, one deploy. No SaaS, no subscriptions, no scraping
 of your data into someone else's product.
@@ -15,6 +17,24 @@ of your data into someone else's product.
   session cookies.
 - **Single tenant by design** — there's no auth, because you're the only
   one with the URL.
+
+## Screenshots
+
+### Library (grid)
+
+![Bookmarx library grid view](./screenshots/readme/library-grid-desktop.png)
+
+### Bookmark reader
+
+![Bookmarx bookmark reader](./screenshots/readme/bookmark-reader-desktop.png)
+
+### Article reader
+
+![Bookmarx article reader](./screenshots/readme/article-reader-desktop.png)
+
+### Mobile library
+
+![Bookmarx mobile library view](./screenshots/readme/library-mobile.png)
 
 ## Stack
 
