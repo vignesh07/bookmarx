@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sql } from "drizzle-orm";
+import { and, gte, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { authors, bookmarks, links, media } from "@/db/schema";
 
@@ -46,6 +46,9 @@ export const IngestBookmark = z.object({
   replyCount: z.number().int().default(0),
   repostCount: z.number().int().default(0),
   likeCount: z.number().int().default(0),
+  // Crawl-position rank assigned by the extension. 0 = top of the user's
+  // X bookmark list. The server uses this to maintain global save order.
+  saveIndex: z.number().int().nonnegative(),
   media: z.array(IngestMedia).default([]),
   links: z.array(IngestLink).default([]),
   raw: z.unknown(),
@@ -53,11 +56,18 @@ export const IngestBookmark = z.object({
 
 export const IngestPayload = z.object({
   bookmarks: z.array(IngestBookmark),
+  // Lowest saveIndex in this batch — the global crawl position of the
+  // first item. Items at save_index >= offset that aren't in this batch
+  // get shifted by batch.length to make room for the new positions.
+  offset: z.number().int().nonnegative(),
 });
 
 export type IngestBookmarkInput = z.infer<typeof IngestBookmark>;
 
-export async function ingestBookmarks(items: IngestBookmarkInput[]) {
+export async function ingestBookmarks(
+  items: IngestBookmarkInput[],
+  offset: number,
+) {
   if (items.length === 0) {
     return { seen: 0, inserted: 0, updated: 0 };
   }
@@ -86,6 +96,22 @@ export async function ingestBookmarks(items: IngestBookmarkInput[]) {
       },
     });
 
+  // Make room for this batch's saveIndex range. Existing rows whose
+  // current save_index falls in or after `offset` get pushed down by
+  // `K = items.length`, except rows that are themselves in this batch
+  // (we'll set those explicitly via the upsert below).
+  const K = items.length;
+  const payloadIds = items.map((b) => b.id);
+  await db
+    .update(bookmarks)
+    .set({ saveIndex: sql`${bookmarks.saveIndex} + ${K}` })
+    .where(
+      and(
+        gte(bookmarks.saveIndex, offset),
+        notInArray(bookmarks.id, payloadIds),
+      ),
+    );
+
   let inserted = 0;
   let updated = 0;
 
@@ -105,6 +131,7 @@ export async function ingestBookmarks(items: IngestBookmarkInput[]) {
         replyCount: b.replyCount,
         repostCount: b.repostCount,
         likeCount: b.likeCount,
+        saveIndex: b.saveIndex,
         raw: b.raw,
       })
       .onConflictDoUpdate({
@@ -114,6 +141,7 @@ export async function ingestBookmarks(items: IngestBookmarkInput[]) {
           replyCount: sql`excluded.reply_count`,
           repostCount: sql`excluded.repost_count`,
           likeCount: sql`excluded.like_count`,
+          saveIndex: sql`excluded.save_index`,
           raw: sql`excluded.raw`,
         },
       })

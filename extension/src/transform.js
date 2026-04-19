@@ -3,7 +3,7 @@
 // retweets, "TweetWithVisibilityResults" wrappers, etc) — unwrap once
 // here so the rest of the codebase only sees the flat shape.
 
-export function transformBookmark(raw) {
+export function transformBookmark(raw, saveIndex) {
   const tweet = unwrap(raw);
   if (!tweet) return null;
 
@@ -85,6 +85,7 @@ export function transformBookmark(raw) {
     replyCount: legacy.reply_count ?? 0,
     repostCount: legacy.retweet_count ?? 0,
     likeCount: legacy.favorite_count ?? 0,
+    saveIndex,
     media: mediaList,
     links,
     raw,

@@ -4,6 +4,34 @@ All notable changes to Bookmarx are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-04-19
+
+### Added
+- Scheduled background sync. The extension now fires a sync every 6
+  hours via `chrome.alarms`, so new X bookmarks show up without you
+  clicking anything.
+- Incremental sync. The extension fetches the set of already-known
+  bookmark ids from the server before crawling and exits the crawl as
+  soon as it sees a full page (100) of consecutive-known tweets. A
+  re-sync of an unchanged library is now one-page instead of full-walk.
+- `GET /api/known-ids` endpoint backing the above.
+
+### Changed
+- Save-order is now correct. v0.1 used the sync wall-clock time as
+  `bookmarkedAt`, which made every bookmark in a batch effectively
+  identical and meant the library was sorted by accident-of-insertion.
+  Bookmarks now have a `save_index` column (0 = newest saved on X) that
+  the extension assigns from its crawl position. The library orders by
+  this. Existing rows are backfilled in their current visual order so
+  upgrading users don't see their library reshuffle.
+- Extension version bumped to 0.2.0; manifest now requests the
+  `alarms` permission.
+
+### Notes
+- A manual sync and a scheduled sync can no longer run concurrently —
+  the second one returns immediately. Prevents double-shifting
+  `save_index` on the server.
+
 ## [0.1.0] — 2026-04-19
 
 Initial public release.
@@ -32,4 +60,5 @@ Initial public release.
   meant to be bound to localhost; the ingest endpoint has no token
   for the same reason.
 
+[0.2.0]: https://github.com/vignesh07/bookmarx/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vignesh07/bookmarx/releases/tag/v0.1.0

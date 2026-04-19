@@ -68,12 +68,16 @@ export async function getLibraryRows(
     .from(bookmarks)
     .where(and(...where));
 
+  // save_index is the X-bookmark-save-order rank (0 = newest saved). It
+  // replaces bookmarked_at for ordering since X doesn't expose a real
+  // saved-at timestamp; bookmarked_at on rows from v0.1 was just the
+  // sync wall-clock time, so it didn't sort meaningfully within a batch.
   const orderBy =
     filter.sort === "oldest"
-      ? asc(bookmarks.bookmarkedAt)
+      ? desc(bookmarks.saveIndex)
       : filter.sort === "top"
         ? desc(bookmarks.likeCount)
-        : desc(bookmarks.bookmarkedAt);
+        : asc(bookmarks.saveIndex);
 
   const rows = await db
     .select({

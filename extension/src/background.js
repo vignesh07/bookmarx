@@ -1,11 +1,30 @@
-// Background service worker. Receives "start" from popup, scrapes
-// X's internal Bookmarks GraphQL endpoint using the user's session
-// cookies + a sniffed query ID, batches results, and POSTs them to
-// the user's Bookmarx server.
+// Background service worker. Receives "start" from popup or fires on a
+// chrome.alarms tick, scrapes X's internal Bookmarks GraphQL endpoint
+// using the user's session cookies + a sniffed query ID, batches results,
+// and POSTs them to the local Bookmarx server.
 
 import { fetchAllBookmarks } from "./xapi.js";
 import { transformBookmark } from "./transform.js";
 import { installSniffer, captureNow, getCapturedConfig } from "./sniff.js";
+
+// Bookmarx assumes the server runs on localhost. If you start `next dev`
+// on a different port, change this constant.
+const SERVER_URL = "http://localhost:3000";
+
+// Items per ingest POST. Smaller batches mean faster shift updates on
+// the server (each batch issues one UPDATE over rows >= offset).
+const BATCH_SIZE = 50;
+
+// Stop the crawl after we see this many already-known tweets in a row.
+// 100 = one full GraphQL page of all-known means everything below is
+// also known (X returns bookmarks in save order, newest first).
+const EARLY_EXIT_THRESHOLD = 100;
+
+// Periodic background sync interval. 6h is a reasonable default — long
+// enough to be polite to X's API, short enough that new bookmarks show
+// up the same day.
+const ALARM_PERIOD_MINUTES = 360;
+const ALARM_NAME = "scheduled-sync";
 
 installSniffer();
 
@@ -37,6 +56,19 @@ chrome.declarativeNetRequest
   })
   .catch((err) => console.error("DNR rule registration failed:", err));
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create(ALARM_NAME, { periodInMinutes: ALARM_PERIOD_MINUTES });
+});
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== ALARM_NAME) return;
+  try {
+    await runSync(noopSend);
+  } catch (err) {
+    console.warn("Scheduled sync skipped:", err?.message ?? err);
+  }
+});
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sync") return;
   const send = makeSafeSender(port);
@@ -49,6 +81,8 @@ chrome.runtime.onConnect.addListener((port) => {
     }
   });
 });
+
+const noopSend = () => {};
 
 // Closing the popup disconnects the port; any subsequent postMessage
 // throws "Attempting to use a disconnected port object" and — because
@@ -69,11 +103,24 @@ function makeSafeSender(port) {
   };
 }
 
-async function runSync(send) {
-  // Bookmarx assumes the server runs on localhost. If you start `next
-  // dev` on a different port, change this constant.
-  const serverUrl = "http://localhost:3000";
+// Manual + scheduled syncs share state — block one if the other is live
+// so we don't double-shift save_index on the server.
+let syncInProgress = false;
 
+async function runSync(send) {
+  if (syncInProgress) {
+    send({ type: "error", text: "A sync is already in progress." });
+    return;
+  }
+  syncInProgress = true;
+  try {
+    await runSyncInner(send);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+async function runSyncInner(send) {
   const hasSession = await hasXSession();
   if (!hasSession) {
     throw new Error(
@@ -87,56 +134,94 @@ async function runSync(send) {
     config = await captureNow();
   }
 
+  send({ type: "progress", text: "Checking what's already synced..." });
+  const knownIds = await fetchKnownIds();
+  const isFirstSync = knownIds.size === 0;
+
   let totalSeen = 0;
   let totalInserted = 0;
   let totalUpdated = 0;
 
-  const BATCH_SIZE = 50;
+  let crawlPosition = 0;
+  let consecutiveKnown = 0;
   let batch = [];
+  let batchStartIndex = 0;
+  let earlyExited = false;
 
   const onLog = (text) => send({ type: "progress", text });
 
-  for await (const raw of fetchAllBookmarks(config, { onLog })) {
-    const transformed = transformBookmark(raw);
-    if (!transformed) continue;
-    batch.push(transformed);
-    if (batch.length >= BATCH_SIZE) {
-      const r = await upload(serverUrl, batch, onLog);
-      totalSeen += r.seen;
-      totalInserted += r.inserted;
-      totalUpdated += r.updated;
-      send({
-        type: "progress",
-        text: `Synced ${totalSeen} so far (${totalInserted} new)...`,
-      });
-      batch = [];
-    }
-  }
-
-  if (batch.length > 0) {
-    const r = await upload(serverUrl, batch, onLog);
+  const flush = async () => {
+    if (batch.length === 0) return;
+    const r = await upload(batch, batchStartIndex, onLog);
     totalSeen += r.seen;
     totalInserted += r.inserted;
     totalUpdated += r.updated;
+    send({
+      type: "progress",
+      text: `Synced ${totalSeen} so far (${totalInserted} new)...`,
+    });
+    batch = [];
+  };
+
+  for await (const raw of fetchAllBookmarks(config, { onLog })) {
+    const transformed = transformBookmark(raw, crawlPosition);
+    if (!transformed) continue;
+
+    if (batch.length === 0) batchStartIndex = crawlPosition;
+    batch.push(transformed);
+    crawlPosition += 1;
+
+    if (!isFirstSync) {
+      if (knownIds.has(transformed.id)) {
+        consecutiveKnown += 1;
+      } else {
+        consecutiveKnown = 0;
+      }
+    }
+
+    if (batch.length >= BATCH_SIZE) {
+      await flush();
+    }
+
+    if (!isFirstSync && consecutiveKnown >= EARLY_EXIT_THRESHOLD) {
+      onLog(`Early exit: ${EARLY_EXIT_THRESHOLD} known bookmarks in a row.`);
+      earlyExited = true;
+      break;
+    }
   }
+
+  await flush();
 
   send({
     type: "done",
     seen: totalSeen,
     inserted: totalInserted,
     updated: totalUpdated,
+    earlyExited,
   });
 }
 
-async function upload(serverUrl, bookmarks, onLog) {
+async function fetchKnownIds() {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/known-ids`);
+    if (!res.ok) return new Set();
+    const data = await res.json();
+    return new Set(data.ids ?? []);
+  } catch {
+    // Server unreachable — fall back to full crawl. Don't block sync on this.
+    return new Set();
+  }
+}
+
+async function upload(bookmarks, offset, onLog) {
   const MAX_ATTEMPTS = 5;
   let lastErr = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const res = await fetch(`${serverUrl}/api/ingest`, {
+      const res = await fetch(`${SERVER_URL}/api/ingest`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ bookmarks }),
+        body: JSON.stringify({ bookmarks, offset }),
       });
       if (res.status >= 400 && res.status < 500 && res.status !== 408) {
         // Auth failures and validation errors won't get better with retry.

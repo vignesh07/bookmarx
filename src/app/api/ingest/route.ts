@@ -84,7 +84,10 @@ async function handlePost(req: Request) {
   });
 
   try {
-    const result = await ingestBookmarks(parsed.data.bookmarks);
+    const result = await ingestBookmarks(
+      parsed.data.bookmarks,
+      parsed.data.offset,
+    );
     await db
       .update(syncRuns)
       .set({

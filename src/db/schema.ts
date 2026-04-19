@@ -38,12 +38,18 @@ export const bookmarks = pgTable(
     isRead: boolean("is_read").default(false).notNull(),
     isFavorite: boolean("is_favorite").default(false).notNull(),
     note: text("note"),
+    // Crawl-position rank from the most recent sync. 0 = top of the user's
+    // X bookmark list (newest saved). The library orders by this ascending.
+    // Indices may have gaps after incremental syncs — that's fine, only
+    // relative order matters.
+    saveIndex: integer("save_index").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [
+    index("bookmarks_save_index_idx").on(t.saveIndex),
     index("bookmarks_bookmarked_at_idx").on(t.bookmarkedAt.desc()),
     index("bookmarks_author_idx").on(t.authorId),
     index("bookmarks_thread_idx").on(t.threadRootId),

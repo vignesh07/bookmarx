@@ -205,6 +205,7 @@ async function main() {
   }
 
   console.log("Inserting bookmarks...");
+  let saveIndex = 0;
   for (const b of BOOKMARKS) {
     const authorId = authorIdByHandle.get(b.authorHandle);
     if (!authorId) throw new Error(`unknown handle ${b.authorHandle}`);
@@ -228,6 +229,7 @@ async function main() {
           replyCount: isHead ? 84 : 0,
           repostCount: isHead ? 312 : 0,
           likeCount: isHead ? 2400 : 0,
+          saveIndex: saveIndex++,
           raw: { seed: true },
           isRead: b.isRead ?? false,
           isFavorite: isHead ? (b.isFavorite ?? false) : false,
@@ -252,6 +254,7 @@ async function main() {
         replyCount: Math.floor(Math.random() * 200),
         repostCount: Math.floor(Math.random() * 800),
         likeCount: Math.floor(Math.random() * 5000),
+        saveIndex: saveIndex++,
         raw: { seed: true },
         isRead: b.isRead ?? false,
         isFavorite: b.isFavorite ?? false,
